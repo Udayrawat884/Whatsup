@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Messaging App</title>
+    <style>
+        .blur-background {
+            filter: blur(5px);
+        }
+        .connecting-modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            padding: 20px;
+            border: 1px solid #ccc;
+            z-index: 999;
+        }
+        .visible {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div id="main-content">
+        <h1>Messaging App</h1>
+        <input type="text" id="username" placeholder="Enter your username" />
+        <button id="register">Register</button>
+
+        <h3>Connect to a user</h3>
+        <input type="text" id="connectTo" placeholder="Username to connect" />
+        <button id="connectButton">Connect</button>
+
+        <ul id="messages"></ul>
+    </div>
+
+    <div id="connectingModal" class="connecting-modal">
+        <p>Connecting to the user...</p>
+    </div>
+
+    <div id="requestModal" class="connecting-modal">
+        <p><span id="fromOrToUser"></span> wants to connect. Accept?</p>
+        <button id="acceptButton">Yes</button>
+        <button id="rejectButton">No</button>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+
+        // Register user
+        document.getElementById('register').addEventListener('click', () => {
+            const username = document.getElementById('username').value;
+            socket.emit('register', username);
+        });
+
+        // Send connection request
+        document.getElementById('connectButton').addEventListener('click', () => {
+            const fromUser = document.getElementById('username').value;
+            const toUser = document.getElementById('connectTo').value;
+            socket.emit('request connection', { fromUser, toUser });
+        });
+
+        // Handle incoming connection request for both users
+        socket.on('connection request', ({ fromUser, toUser }) => {
+            const username = document.getElementById('username').value;
+            document.getElementById('fromOrToUser').innerText = fromUser || toUser;
+            document.getElementById('requestModal').classList.add('visible');
+        });
+
+        // Accept or reject connection request
+        document.getElementById('acceptButton').addEventListener('click', () => {
+            const user = document.getElementById('username').value;
+            const targetUser = document.getElementById('fromOrToUser').innerText;
+            socket.emit('connection response', { user, targetUser, accepted: true });
+
+            // Blur background and show connecting modal
+            document.getElementById('connectingModal').classList.add('visible');
+            document.getElementById('main-content').classList.add('blur-background');
+            document.getElementById('requestModal').classList.remove('visible');
+        });
+
+        document.getElementById('rejectButton').addEventListener('click', () => {
+            const user = document.getElementById('username').value;
+            const targetUser = document.getElementById('fromOrToUser').innerText;
+            socket.emit('connection response', { user, targetUser, accepted: false });
+
+            // Hide the modal
+            document.getElementById('requestModal').classList.remove('visible');
+        });
+
+        // Handle connection accepted for both users
+        socket.on('connection accepted', ({ chatSessionId }) => {
+            window.location.href = `/chat.html?session=${chatSessionId}`;
+        });
+
+        // Handle connection rejected
+        socket.on('connection rejected', () => {
+            alert('The user rejected your connection request.');
+            document.getElementById('connectingModal').classList.remove('visible');
+            document.getElementById('main-content').classList.remove('blur-background');
+        });
+
+        // Handle offline user
+        socket.on('user offline', ({ toUser }) => {
+            alert(`${toUser} is offline.`);
+        });
+    </script>
+</body>
+</html>
